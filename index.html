@@ -805,62 +805,29 @@ async function openShipmentDetail(shipId) {
   if (!s) return;
   currentShipment = s;
 
-  // Fetch ShipsGo tracking directly (ShipsGo supports CORS)
+  // Fetch ShipsGo tracking via Supabase Edge Function
   let milestones = [];
   const trackingRef = s.t49_container;
   const isAir = s.mode && s.mode.toLowerCase().includes('air');
-  const SHIPSGO_KEY = 'e7e1a69e-3332-4705-af77-cec96d212eef';
   if (trackingRef) {
     try {
-      if (isAir) {
-        // Air cargo tracking
-        const r = await fetch('https://shipsgo.com/api/v1.1/AirService/PostAirShipmentRequest', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'AuthCode': SHIPSGO_KEY },
-          body: JSON.stringify({ airWaybillNumber: trackingRef })
-        });
-        if (r.ok) {
-          const data = await r.json();
-          console.log('ShipsGo Air:', JSON.stringify(data));
-          const checkpoints = data.checkpoints || data.Checkpoints || [];
-          milestones = checkpoints.map(cp => ({
-            event: cp.event || cp.Event || cp.status || 'Update',
-            detail: cp.description || cp.Description || '',
-            location: cp.location || cp.Location || cp.airport || '',
-            time: (cp.date || cp.Date) ? new Date(cp.date || cp.Date).toLocaleString('en-GB', {day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '',
-            done: true
-          }));
+      const trackingParam = isAir
+        ? `awb=${encodeURIComponent(trackingRef)}&mode=air`
+        : `container=${encodeURIComponent(trackingRef)}&mode=sea`;
+      const r = await fetch(`${SUPABASE_URL}/functions/v1/shipsgo-tracking?${trackingParam}`, {
+        headers: {
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      if (r.ok) {
+        const data = await r.json();
+        console.log('ShipsGo response:', JSON.stringify(data));
+        if (data.milestones && data.milestones.length) {
+          milestones = data.milestones;
         }
       } else {
-        // Ocean container tracking - Step 1: register
-        const postR = await fetch('https://shipsgo.com/api/v1.2/ContainerService/PostContainerRequest', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'AuthCode': SHIPSGO_KEY },
-          body: JSON.stringify({ shippingLine: 'AUTO', containerNumber: trackingRef })
-        });
-        if (postR.ok) {
-          const postData = await postR.json();
-          console.log('ShipsGo POST:', JSON.stringify(postData));
-          const requestId = postData.containerRequestId || postData.ContainerRequestId || postData.requestId || postData.id;
-          if (requestId) {
-            // Step 2: get tracking info
-            const getR = await fetch(`https://shipsgo.com/api/v1.2/ContainerService/GetContainerInfo?authCode=${SHIPSGO_KEY}&requestId=${requestId}`);
-            if (getR.ok) {
-              const info = await getR.json();
-              console.log('ShipsGo GET:', JSON.stringify(info));
-              const movements = info.containerTransportInfo?.movements || info.movements || info.Movements || info.checkpoints || info.Checkpoints || [];
-              milestones = movements
-                .sort((a,b) => new Date(b.date||b.Date||b.actualTime||0).getTime() - new Date(a.date||a.Date||a.actualTime||0).getTime())
-                .map(m => ({
-                  event: m.moves || m.Moves || m.activity || m.event || m.status || 'Update',
-                  detail: m.description || m.Description || '',
-                  location: m.location || m.Location || m.portName || '',
-                  time: (m.date||m.Date||m.actualTime) ? new Date(m.date||m.Date||m.actualTime).toLocaleString('en-GB', {day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '',
-                  done: !!(m.date||m.Date||m.actualTime)
-                }));
-            }
-          }
-        }
+        console.error('ShipsGo function error:', r.status, await r.text());
       }
     } catch(err) { console.error('ShipsGo error:', err); }
   }
