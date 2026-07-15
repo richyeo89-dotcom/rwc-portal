@@ -558,7 +558,7 @@ tr:hover td { background: var(--grey-50); }
 <script>
 const SUPABASE_URL = 'https://lpeqgtxghwprazgyoxpq.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_iGgjto0sDDSzAxxR4BLWIg_1teIcq2E';
-const T49_KEY = 'j5mMvoyWmZvxctA1dFVZeJQn';
+const SHIPSGO_KEY = 'e7e1a69e-3332-4705-af77-cec96d212eef'; // ShipsGo API Key
 
 const { createClient } = supabase;
 const db = createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -805,11 +805,17 @@ async function openShipmentDetail(shipId) {
   if (!s) return;
   currentShipment = s;
 
-  // Fetch T49 tracking via Supabase Edge Function (avoids CORS)
+  // Fetch ShipsGo tracking via Supabase Edge Function (avoids CORS)
+  // Supports both ocean containers (t49_container field) and air waybills (bl_number field for air mode)
   let milestones = [];
-  if (s.t49_container) {
+  const trackingRef = s.t49_container;
+  const isAir = s.mode && s.mode.toLowerCase().includes('air');
+  if (trackingRef) {
     try {
-      const r = await fetch(`${SUPABASE_URL}/functions/v1/t49-tracking?container=${s.t49_container}`, {
+      const trackingParam = isAir
+        ? `awb=${encodeURIComponent(trackingRef)}&mode=air`
+        : `container=${encodeURIComponent(trackingRef)}&mode=sea`;
+      const r = await fetch(`${SUPABASE_URL}/functions/v1/shipsgo-tracking?${trackingParam}`, {
         headers: {
           'Authorization': `Bearer ${SUPABASE_KEY}`,
           'Content-Type': 'application/json'
@@ -821,7 +827,7 @@ async function openShipmentDetail(shipId) {
           milestones = data.milestones;
         }
       }
-    } catch(err) { console.error('T49 error:', err); }
+    } catch(err) { console.error('ShipsGo tracking error:', err); }
   }
 
   // Fetch docs
@@ -858,7 +864,7 @@ async function openShipmentDetail(shipId) {
 
     <!-- Tracking Timeline -->
     <div class="card" style="margin-bottom:16px;">
-      <div class="card-title">Tracking Timeline ${s.t49_container ? '· Live from Terminal49' : '· Manual Updates'}</div>
+      <div class="card-title">Tracking Timeline ${s.t49_container ? '· Live from ShipsGo' : '· Manual Updates'}</div>
       ${milestones.length ? `
         <div class="timeline">
           ${milestones.map(m => `
