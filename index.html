@@ -822,12 +822,12 @@ async function openShipmentDetail(shipId) {
       });
       if (r.ok) {
         const data = await r.json();
-        console.log('ShipsGo response:', JSON.stringify(data));
         if (data.milestones && data.milestones.length) {
           milestones = data.milestones;
         }
-      } else {
-        console.error('ShipsGo function error:', r.status, await r.text());
+        if (data.mapToken) {
+          window._shipsgoMapToken = data.mapToken;
+        }
       }
     } catch(err) { console.error('ShipsGo error:', err); }
   }
@@ -868,6 +868,12 @@ async function openShipmentDetail(shipId) {
     <div class="card" style="margin-bottom:16px;">
       <div class="card-title">Tracking Timeline ${s.t49_container ? '· Live from ShipsGo' : '· Manual Updates'}</div>
       ${milestones.length ? `
+        ${window._shipsgoMapToken ? `
+        <iframe
+          src="https://app.shipsgo.com/share/map/${window._shipsgoMapToken}"
+          style="width:100%;height:220px;border:none;border-radius:8px;margin-bottom:16px;"
+          loading="lazy"
+        ></iframe>` : ''}
         <div class="timeline">
           ${milestones.map(m => `
             <div class="milestone ${m.done?'done':'pending'}">
