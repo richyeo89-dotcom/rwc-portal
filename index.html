@@ -632,11 +632,13 @@ function initShipMap() {
     L.polyline(waypoints, { color: '#2779B7', weight: 2.5, dashArray: '8,5' }).addTo(map);
     const portIcon = L.divIcon({
       html: '<div style="width:12px;height:12px;background:#032143;border-radius:50%;border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.4);"></div>',
-      iconSize:[12,12], iconAnchor:[6,6]
+      iconSize:[12,12], iconAnchor:[6,6],
+      className: ''
     });
     const shipIcon = L.divIcon({
       html: '<div style="width:14px;height:14px;background:#FC570D;border-radius:50%;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.4);"></div>',
-      iconSize:[14,14], iconAnchor:[7,7]
+      iconSize:[14,14], iconAnchor:[7,7],
+      className: ''
     });
     L.marker(pol, {icon: portIcon}).bindTooltip(md.polName, {permanent:false}).addTo(map);
     L.marker(pod, {icon: portIcon}).bindTooltip(md.podName, {permanent:false}).addTo(map);
