@@ -1,4 +1,4 @@
- <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -614,15 +614,29 @@ function initShipMap() {
     const pol = [md.polLat, md.polLng];
     const pod = [md.podLat, md.podLng];
     const pct = (md.transitPct || 0) / 100;
-    const vesLat = md.vesselLat || (pol[0] + (pod[0] - pol[0]) * pct);
-    const vesLng = md.vesselLng || (pol[1] + (pod[1] - pol[1]) * pct);
-    L.polyline([pol, [vesLat, vesLng], pod], { color: '#2779B7', weight: 2, dashArray: '6,4' }).addTo(map);
+    // Route waypoints: India -> tip of Africa -> Nigeria (going east, around Cape of Good Hope)
+    const waypoints = [
+      pol,                        // Nhava Sheva, India
+      [1.3521, 103.8198],         // Singapore area (east route)
+      [-10.0, 55.0],              // Indian Ocean
+      [-34.0, 26.0],              // Cape of Good Hope area
+      [-15.0, 12.0],              // Angola coast
+      pod                         // Apapa, Nigeria
+    ];
+    // Estimate vessel position along waypoints based on transit %
+    const totalLegs = waypoints.length - 1;
+    const legProgress = pct * totalLegs;
+    const legIndex = Math.min(Math.floor(legProgress), totalLegs - 1);
+    const legFrac = legProgress - legIndex;
+    const vesLat = md.vesselLat || (waypoints[legIndex][0] + (waypoints[legIndex+1][0] - waypoints[legIndex][0]) * legFrac);
+    const vesLng = md.vesselLng || (waypoints[legIndex][1] + (waypoints[legIndex+1][1] - waypoints[legIndex][1]) * legFrac);
+    L.polyline(waypoints, { color: '#2779B7', weight: 2, dashArray: '6,4' }).addTo(map);
     const portIcon = L.divIcon({ html: '<div style="width:10px;height:10px;background:#032143;border-radius:50%;border:2px solid white;"></div>', iconSize:[10,10], iconAnchor:[5,5] });
     const shipIcon = L.divIcon({ html: '<div style="font-size:20px;line-height:1;">🚢</div>', iconSize:[24,24], iconAnchor:[12,12] });
     L.marker(pol, {icon: portIcon}).bindTooltip(md.polName, {permanent:false}).addTo(map);
     L.marker(pod, {icon: portIcon}).bindTooltip(md.podName, {permanent:false}).addTo(map);
     L.marker([vesLat, vesLng], {icon: shipIcon}).bindTooltip((md.status || 'SAILING'), {permanent:false}).addTo(map);
-    map.fitBounds([[Math.min(pol[0],pod[0])-5, Math.min(pol[1],pod[1])-5],[Math.max(pol[0],pod[0])+5, Math.max(pol[1],pod[1])+5]]);
+    map.fitBounds([[-40, 3.3], [19, 110]]);
   }
   if (!window.L) {
     const css = document.createElement('link');
