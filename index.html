@@ -614,29 +614,34 @@ function initShipMap() {
     const pol = [md.polLat, md.polLng];
     const pod = [md.podLat, md.podLng];
     const pct = (md.transitPct || 0) / 100;
-    // Route waypoints: India -> tip of Africa -> Nigeria (going east, around Cape of Good Hope)
+    // Route waypoints: Nhava Sheva -> Indian Ocean -> Cape of Good Hope -> Nigeria
     const waypoints = [
-      pol,                        // Nhava Sheva, India
-      [1.3521, 103.8198],         // Singapore area (east route)
-      [-10.0, 55.0],              // Indian Ocean
-      [-34.0, 26.0],              // Cape of Good Hope area
-      [-15.0, 12.0],              // Angola coast
-      pod                         // Apapa, Nigeria
+      pol,              // Nhava Sheva (18.9, 72.9)
+      [5.0, 65.0],      // Indian Ocean (south of India, heading west)
+      [-25.0, 35.0],    // Mozambique channel
+      [-34.5, 19.5],    // Cape of Good Hope
+      [-15.0, 5.0],     // South Atlantic
+      pod               // Apapa, Nigeria (6.4, 3.4)
     ];
-    // Estimate vessel position along waypoints based on transit %
     const totalLegs = waypoints.length - 1;
     const legProgress = pct * totalLegs;
     const legIndex = Math.min(Math.floor(legProgress), totalLegs - 1);
     const legFrac = legProgress - legIndex;
     const vesLat = md.vesselLat || (waypoints[legIndex][0] + (waypoints[legIndex+1][0] - waypoints[legIndex][0]) * legFrac);
     const vesLng = md.vesselLng || (waypoints[legIndex][1] + (waypoints[legIndex+1][1] - waypoints[legIndex][1]) * legFrac);
-    L.polyline(waypoints, { color: '#2779B7', weight: 2, dashArray: '6,4' }).addTo(map);
-    const portIcon = L.divIcon({ html: '<div style="width:10px;height:10px;background:#032143;border-radius:50%;border:2px solid white;"></div>', iconSize:[10,10], iconAnchor:[5,5] });
-    const shipIcon = L.divIcon({ html: '<div style="font-size:20px;line-height:1;">🚢</div>', iconSize:[24,24], iconAnchor:[12,12] });
+    L.polyline(waypoints, { color: '#2779B7', weight: 2.5, dashArray: '8,5' }).addTo(map);
+    const portIcon = L.divIcon({
+      html: '<div style="width:12px;height:12px;background:#032143;border-radius:50%;border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.4);"></div>',
+      iconSize:[12,12], iconAnchor:[6,6]
+    });
+    const shipIcon = L.divIcon({
+      html: '<div style="background:#FC570D;color:white;font-size:11px;font-weight:700;padding:3px 7px;border-radius:12px;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,0.3);">⚓ SAILING</div>',
+      iconSize:[90,24], iconAnchor:[45,12]
+    });
     L.marker(pol, {icon: portIcon}).bindTooltip(md.polName, {permanent:false}).addTo(map);
     L.marker(pod, {icon: portIcon}).bindTooltip(md.podName, {permanent:false}).addTo(map);
-    L.marker([vesLat, vesLng], {icon: shipIcon}).bindTooltip((md.status || 'SAILING'), {permanent:false}).addTo(map);
-    map.fitBounds([[-40, 3.3], [19, 110]]);
+    L.marker([vesLat, vesLng], {icon: shipIcon}).addTo(map);
+    map.fitBounds([[-38, 3], [22, 80]]);
   }
   if (!window.L) {
     const css = document.createElement('link');
