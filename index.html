@@ -635,12 +635,8 @@ function initShipMap() {
       iconSize:[12,12], iconAnchor:[6,6]
     });
     const shipIcon = L.divIcon({
-      html: `<div style="background:#032143;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,0.4);border:2px solid white;">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="white">
-          <path d="M20 21c-1.39 0-2.78-.47-4-1.32-2.44 1.71-5.56 1.71-8 0C6.78 20.53 5.39 21 4 21H2v2h2c1.38 0 2.74-.35 4-.99 2.52 1.29 5.48 1.29 8 0 1.26.64 2.62.99 4 .99h2v-2h-2zM3.95 19H4c1.6 0 3.02-.88 4-2 .98 1.12 2.4 2 4 2s3.02-.88 4-2c.98 1.12 2.4 2 4 2h.05l1.89-6.68c.08-.26.06-.54-.06-.78s-.34-.42-.6-.5L19 10.62V6c0-1.1-.9-2-2-2h-3V1H10v3H7c-1.1 0-2 .9-2 2v4.62l-1.29.42c-.26.08-.48.26-.6.5s-.15.52-.06.78L3.95 19zM7 6h10v3.97L12 8 7 9.97V6z"/>
-        </svg>
-      </div>`,
-      iconSize:[36,36], iconAnchor:[18,18]
+      html: '<div style="width:14px;height:14px;background:#FC570D;border-radius:50%;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.4);"></div>',
+      iconSize:[14,14], iconAnchor:[7,7]
     });
     L.marker(pol, {icon: portIcon}).bindTooltip(md.polName, {permanent:false}).addTo(map);
     L.marker(pod, {icon: portIcon}).bindTooltip(md.podName, {permanent:false}).addTo(map);
@@ -997,6 +993,16 @@ function msgHTML(m) {
     </div>`;
 }
 
+async function notifyClient(type, shipmentId, extra = {}) {
+  try {
+    await fetch(`${SUPABASE_URL}/functions/v1/send-notification`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type, shipmentId, ...extra })
+    });
+  } catch(e) { console.log('Notify error:', e); }
+}
+
 async function sendMessage(shipId) {
   const input = document.getElementById('chat-input');
   const text = input.value.trim();
@@ -1015,6 +1021,11 @@ async function sendMessage(shipId) {
     sender_name: senderName,
     message: text
   });
+
+  // Notify client when staff sends message
+  if (currentRole === 'staff') {
+    notifyClient('message', shipId, { message: text });
+  }
 
   await refreshMessages(shipId);
 }
@@ -1260,9 +1271,26 @@ async function saveShipment() {
     t49_container: document.getElementById('sm-t49').value,
   };
   let error;
-  if (id) { ({ error } = await db.from('shipments').update(data).eq('id', id)); }
-  else { ({ error } = await db.from('shipments').insert(data)); }
+  let oldStatus = null;
+  if (id) {
+    // Get old status before update
+    const { data: oldShip } = await db.from('shipments').select('status').eq('id', id).single();
+    oldStatus = oldShip?.status;
+    ({ error } = await db.from('shipments').update(data).eq('id', id));
+  } else {
+    ({ error } = await db.from('shipments').insert(data));
+  }
   if (error) { showToast('❌ ' + error.message); return; }
+
+  // Send email if status changed or latest_update changed
+  if (id) {
+    if (oldStatus && oldStatus !== data.status) {
+      notifyClient('status', id, { statusFrom: oldStatus, statusTo: data.status });
+    } else if (data.latest_update) {
+      notifyClient('update', id, { message: data.latest_update });
+    }
+  }
+
   showToast(id ? '✅ Shipment updated' : '✅ Shipment added');
   closeModal('shipment-modal');
   await loadAllData();
